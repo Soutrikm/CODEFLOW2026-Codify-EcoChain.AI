@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoChain AI Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-main: #0f172a;
+            --bg-card: #1e293b;
+            --accent: #10b981;
+            --accent-hover: #059669;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            margin: 0;
+            padding: clamp(10px, 4vw, 40px) clamp(10px, 2vw, 20px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .dashboard-container {
+            width: 100%;
+            max-width: 1200px; /* Expands nicely on ultra-wide screens */
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .dashboard-card {
+            background-color: var(--bg-card);
+            padding: clamp(20px, 5vw, 35px);
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--border);
+            box-sizing: border-box;
+        }
+
+        .header {
+            margin-bottom: 25px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 15px;
+        }
+
+        h2 {
+            color: var(--accent);
+            margin: 0 0 8px 0;
+            font-size: clamp(22px, 4vw, 28px);
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: clamp(12px, 2vw, 14px);
+            margin: 0;
+        }
+
+        /* Responsive Layout Grid: 1 column on mobile, 2 columns on tablets/desktops */
+        .grid-layout {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .full-width {
+            grid-column: span 1;
+        }
+
+        /* On screens larger than 640px, let wide inputs span both columns */
+        @media (min-width: 640px) {
+            .full-width {
+                grid-column: span 2;
+            }
+        }
+
+        /* Modern split view layout for massive screens (Desktop Dashboard optimization) */
+        @media (min-width: 1024px) {
+            .dashboard-container {
+                flex-direction: row;
+                align-items: flex-start;
+            }
+            .dashboard-card {
+                flex: 1;
+                min-width: 500px;
+            }
+            .results-panel {
+                flex: 1;
+                margin-top: 0 !important;
+                position: sticky;
+                top: 40px;
+            }
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        input {
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            font-size: 15px;
+            box-sizing: border-box;
+            width: 100%;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        button {
+            background-color: var(--accent);
+            color: #ffffff;
+            border: none;
+            padding: 14px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .results-panel {
+            margin-top: 25px;
+            padding: clamp(20px, 5vw, 35px);
+            border-radius: 16px;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
+            border-left: 5px solid var(--accent);
+            display: none;
+            box-sizing: border-box;
+            width: 100%;
+        }
+
+        .result-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-muted);
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .result-value {
+            font-size: clamp(24px, 5vw, 32px);
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 20px;
+        }
+
+        /* Fully fluid wrapper for the Chart canvas object */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: clamp(220px, 40vh, 320px);
+        }
+
+        .error-panel { border-left-color: #ef4444; }
+    </style>
+</head>
+<body>
+
+<div class="dashboard-container">
+    <div class="dashboard-card">
+        <div class="header">
+            <h2>🌍 EcoChain Intelligence Engine</h2>
+            <p class="subtitle">UN SDG 13: Live Machine Learning Carbon Emission Forecasting Platform</p>
+        </div>
+        
+        <div class="grid-layout">
+            <div class="form-group">
+                <label>Country Name</label>
+                <input type="text" id="countryName" value="India">
+            </div>
+            <div class="form-group">
+                <label>Country Code</label>
+                <input type="text" id="countryCode" value="IND">
+            </div>
+            <div class="form-group full-width">
+                <label>Series Descriptor Name</label>
+                <input type="text" id="seriesName" value="CO2 emissions (kt)">
+            </div>
+            <div class="form-group full-width">
+                <label>Series Tracking Code</label>
+                <input type="text" id="seriesCode" value="EN.ATM.CO2E.KT">
+            </div>
+            
+            <div class="form-group">
+                <label>1990 Emissions (kt)</label>
+                <input type="number" id="y1990" value="560000">
+            </div>
+            <div class="form-group">
+                <label>1995 Emissions (kt)</label>
+                <input type="number" id="y1995" value="780000">
+            </div>
+            <div class="form-group">
+                <label>2000 Emissions (kt)</label>
+                <input type="number" id="y2000" value="990000">
+            </div>
+            <div class="form-group">
+                <label>2005 Emissions (kt)</label>
+                <input type="number" id="y2005" value="1410000">
+            </div>
+            <div class="form-group full-width">
+                <label>2010 Emissions (kt)</label>
+                <input type="number" id="y2010" value="2000000">
+            </div>
+            
+            <input type="hidden" id="scale" value="0.0">
+            <input type="hidden" id="decimals" value="1.0">
+            
+            <button class="full-width" onclick="executeModelInference()">Run Live Predictive Inference</button>
+        </div>
+    </div>
+
+    <div id="resultsPanel" class="results-panel">
+        <div class="result-title" id="panelTitle">Model Projections Matrix</div>
+        <div class="result-value" id="panelValue">--</div>
+        
+        <div class="chart-container">
+            <canvas id="emissionsChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<script>
+let climateChartInstance = null;
+
+async function executeModelInference() {
+    const panel = document.getElementById('resultsPanel');
+    const title = document.getElementById('panelTitle');
+    const value = document.getElementById('panelValue');
+    
+    const v1990 = parseFloat(document.getElementById('y1990').value) || 0.0;
+    const v1995 = parseFloat(document.getElementById('y1995').value) || 0.0;
+    const v2000 = parseFloat(document.getElementById('y2000').value) || 0.0;
+    const v2005 = parseFloat(document.getElementById('y2005').value) || 0.0;
+    const v2010 = parseFloat(document.getElementById('y2010').value) || 0.0;
+
+    const payload = {
+        Country_code: document.getElementById('countryCode').value,
+        Country_name: document.getElementById('countryName').value,
+        Series_code: document.getElementById('seriesCode').value,
+        Series_name: document.getElementById('seriesName').value,
+        SCALE: parseFloat(document.getElementById('scale').value) || 0.0,
+        Decimals: parseFloat(document.getElementById('decimals').value) || 0.0,
+        year_1990: v1990,
+        year_1995: v1995,
+        year_2000: v2000,
+        year_2005: v2005,
+        year_2010: v2010
+    };
+
+    try {
+        const response = await fetch('http://127.0.0.1:8000/predict', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        
+        const data = await response.json();
+        panel.style.display = 'block';
+        
+        if (data.success) {
+            const predictionValue = data.predicted_emissions_2011;
+            
+            title.innerText = "Predicted 2011 Emissions Trajectory";
+            value.innerHTML = `${predictionValue.toLocaleString(undefined, {maximumFractionDigits: 2})} <span style="font-size: 16px; color: var(--text-muted);">kt</span>`;
+            
+            const ctx = document.getElementById('emissionsChart').getContext('2d');
+            
+            if (climateChartInstance) {
+                climateChartInstance.destroy();
+            }
+            
+            climateChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['1990', '1995', '2000', '2005', '2010', '2011 (AI)'],
+                    datasets: [{
+                        label: 'Carbon Emissions Trend (kt)',
+                        data: [v1990, v1995, v2000, v2005, v2010, predictionValue],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.3,
+                        pointBackgroundColor: ['#94a3b8', '#94a3b8', '#94a3b8', '#94a3b8', '#94a3b8', '#ef4444'],
+                        pointRadius: [5, 5, 5, 5, 5, 8]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            grid: { color: '#334155' },
+                            ticks: { color: '#94a3b8' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+            
+        } else {
+            panel.className = "results-panel error-panel";
+            value.innerText = "Validation Exception.";
+        }
+    } catch (error) {
+        panel.className = "results-panel error-panel";
+        title.innerText = "Network Failure";
+        value.innerText = "Ensure your Uvicorn server is running on port 8000.";
+    }
+}
+</script>
+</body>
+</html>
