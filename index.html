@@ -188,6 +188,10 @@
             width: 100%;
             transition: all 0.2s ease;
             box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
         }
 
         button:hover {
@@ -195,11 +199,27 @@
             transform: translateY(-1px);
         }
 
-        button:active {
-            transform: translateY(1px);
+        button:disabled {
+            background-color: var(--text-muted);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
 
-        /* Analytics Right Panel Side */
+        .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 0.8s linear infinite;
+            display: none;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
         .analytics-panel {
             display: flex;
             flex-direction: column;
@@ -268,7 +288,6 @@
             margin-top: 12px;
         }
 
-        /* Error States Layout styling */
         .error-card {
             border-left: 4px solid var(--danger) !important;
         }
@@ -358,7 +377,10 @@
             <input type="hidden" id="scale" value="0.0">
             <input type="hidden" id="decimals" value="1.0">
 
-            <button onclick="executeModelInference()">Compute Predictive Projection</button>
+            <button id="submitBtn" onclick="executeModelInference()">
+                <div class="spinner" id="btnSpinner"></div>
+                <span id="btnText">Compute Predictive Projection</span>
+            </button>
         </div>
     </div>
 
@@ -375,7 +397,7 @@
 
         <div id="insightsMatrix" style="display: none; width: 100%;">
             <div class="header-section">
-                <span class="badge" style="background-color: rgba(59, 130, 246, 0.1); color: #3b82f6; border-color: rgba(59, 130, 246, 0.2);">Data Center Live</span>
+                <span class="badge" id="panelBadge" style="background-color: rgba(59, 130, 246, 0.1); color: #3b82f6; border-color: rgba(59, 130, 246, 0.2);">Data Center Live</span>
                 <h2 id="panelTitle">Calculated Projections</h2>
                 <p class="subtitle" id="panelMeta">Time series macro analysis trend line outputs.</p>
             </div>
@@ -402,7 +424,6 @@
 <script>
 let climateChartInstance = null;
 
-// Auto-detect country code and update internal form state
 function handleCountryChange() {
     const selectEl = document.getElementById('countrySelect');
     const selectedOption = selectEl.options[selectEl.selectedIndex];
@@ -413,7 +434,7 @@ function handleCountryChange() {
     document.getElementById('countryCode').value = isoCode;
     document.getElementById('countryName').value = countryName;
     
-    console.log(`Context changed to: ${countryName} [${isoCode}]`);
+    console.log(`Context tracking modified: ${countryName} [${isoCode}]`);
 }
 
 async function executeModelInference() {
@@ -426,10 +447,24 @@ async function executeModelInference() {
     const valueText = document.getElementById('panelValue');
     const baseValueText = document.getElementById('baseValue');
     const kpiLabel = document.getElementById('kpiLabel');
+    const panelBadge = document.getElementById('panelBadge');
     const targetYear = document.getElementById('targetYear').value;
 
+    const submitBtn = document.getElementById('submitBtn');
+    const btnSpinner = document.getElementById('btnSpinner');
+    const btnText = document.getElementById('btnText');
+
+    submitBtn.disabled = true;
+    btnSpinner.style.display = "block";
+    btnText.innerText = "Processing Inference...";
+
+    // Reset error layouts if previously triggered
     displayContainer.classList.remove('error-card');
     valueText.classList.remove('error-text');
+    panelBadge.style.backgroundColor = "rgba(59, 130, 246, 0.1)";
+    panelBadge.style.color = "#3b82f6";
+    panelBadge.style.borderColor = "rgba(59, 130, 246, 0.2)";
+    panelBadge.innerText = "Data Center Live";
 
     const v1990 = parseFloat(document.getElementById('y1990').value) || 0.0;
     const v1995 = parseFloat(document.getElementById('y1995').value) || 0.0;
@@ -454,7 +489,7 @@ async function executeModelInference() {
     };
 
     try {
-        const response = await fetch(`http://127.0.0.1:8000/predict_future?target_year=${targetYear}`, {
+        const response = await fetch(`https://codeflow2026-codify-ecochain-ai.onrender.com/predict_future?target_year=${targetYear}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -465,12 +500,15 @@ async function executeModelInference() {
         welcomeState.style.display = 'none';
         insightsMatrix.style.display = 'block';
         
-        if (data.success) {
-            const predictionValue = data.predicted_emissions;
+        // Check if response is valid and contains prediction properties directly
+        if (response.ok && (data.predicted_emissions !== undefined || data.success)) {
+            // Support both root level variables and wrapped data keys smoothly
+            const predictionValue = data.predicted_emissions !== undefined ? data.predicted_emissions : data.predicted_emissions;
+            const resYear = data.target_year || targetYear;
             
             title.innerText = "System Predictive Trend Matrix";
-            kpiLabel.innerText = `${data.target_year} Model Target`;
-            metaText.innerText = `Machine Learning time series run tracking forward to target step year ${data.target_year}.`;
+            kpiLabel.innerText = `${resYear} Model Target`;
+            metaText.innerText = `Machine Learning time series run tracking forward to target step year ${resYear}.`;
             valueText.innerHTML = `${predictionValue.toLocaleString(undefined, {maximumFractionDigits: 2})} <span style="font-size: 14px; color: var(--text-muted);">kt</span>`;
             
             const ctx = document.getElementById('emissionsChart').getContext('2d');
@@ -479,7 +517,7 @@ async function executeModelInference() {
                 climateChartInstance.destroy();
             }
             
-            let chartLabels = ['1990', '1995', '2000', '2005', '2010', `${data.target_year} (AI)`];
+            let chartLabels = ['1990', '1995', '2000', '2005', '2010', `${resYear} (AI)`];
             let chartData = [v1990, v1995, v2000, v2005, v2010, predictionValue];
             
             const lineGlow = ctx.createLinearGradient(0, 0, 0, 350);
@@ -523,20 +561,36 @@ async function executeModelInference() {
             });
             
         } else {
+            // Server error handler structure
             displayContainer.classList.add('error-card');
             valueText.classList.add('error-text');
+            panelBadge.style.backgroundColor = "rgba(244, 63, 94, 0.1)";
+            panelBadge.style.color = "var(--danger)";
+            panelBadge.style.borderColor = "rgba(244, 63, 94, 0.2)";
+            panelBadge.innerText = "Pipeline Interrupted";
+            
             title.innerText = "Execution Interrupted";
-            valueText.innerText = "Validation Exception.";
-            metaText.innerText = data.detail || "The pipeline threw an integrity exception error processing vectors.";
+            valueText.innerText = "Validation Exception";
+            metaText.innerText = data.detail || "The pipeline threw an integrity exception error processing data vector values.";
         }
     } catch (error) {
         welcomeState.style.display = 'none';
         insightsMatrix.style.display = 'block';
         displayContainer.classList.add('error-card');
         valueText.classList.add('error-text');
+        
+        panelBadge.style.backgroundColor = "rgba(244, 63, 94, 0.1)";
+        panelBadge.style.color = "var(--danger)";
+        panelBadge.style.borderColor = "rgba(244, 63, 94, 0.2)";
+        panelBadge.innerText = "Gateway Offline";
+
         title.innerText = "Network Gateway Offline";
         valueText.innerText = "Connection Failed";
-        metaText.innerText = "Verify that your backend FastAPI Uvicorn engine execution pipeline is running active on local port 8000.";
+        metaText.innerText = "Verify that your backend Render server engine execution pipeline is live and accessible.";
+    } finally {
+        submitBtn.disabled = false;
+        btnSpinner.style.display = "none";
+        btnText.innerText = "Compute Predictive Projection";
     }
 }
 </script>
